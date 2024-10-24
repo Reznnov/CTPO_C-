@@ -1,5 +1,7 @@
 #include <SDL.h>
 #include <iostream>
+#include <SDL_image.h>
+
 
 //размер окна
 const int SCREEN_WIDTH = 800;
@@ -9,11 +11,34 @@ struct Player {
 	SDL_Rect rect; //Позиция и размер игрока
 	int velx, vely;
 	bool onGround;
+	SDL_Texture* texture;
+	int frame;
+	int direction; //-1 в лево, 1 в право
 };
 
 struct Platform {
 	SDL_Rect rect; //Позиция и размер платформы
+	SDL_Texture* texture;
 };
+
+SDL_Texture* loadTexture(const std::string& file, SDL_Renderer* renderer) {
+	SDL_Texture* nexTexture = nullptr;
+	SDL_Surface* loadedSurface = IMG_Load(file.c_str());
+
+	if (loadedSurface == nullptr) {
+		std::cerr << "Ne udalos zagrusit izobrajenie: " << IMG_GetError() << std::endl;
+		return nullptr;
+	}
+
+	nexTexture = SDL_CreateTextureFromSurface(renderer, loadedSurface);
+	SDL_FreeSurface(loadedSurface);
+
+	if (nexTexture == nullptr) {
+		std::cerr << "Ne udalos sozdat' texture: " << SDL_GetError() << std::endl;
+	}
+
+	return nexTexture;
+}
 
 void initSDL(SDL_Window** window, SDL_Renderer** renderer) {
 	if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -37,15 +62,20 @@ void handleInput(Player& player, const Uint8* keystate) {
 
 	if (keystate[SDL_SCANCODE_LEFT]) {
 		player.velx = -5;
+		player.direction = -1;
+		player.frame = (SDL_GetTicks() / 100) % 6;
 	}
 	if (keystate[SDL_SCANCODE_RIGHT]) {
 		player.velx = 5;
+		player.direction = 1;
+		player.frame = (SDL_GetTicks() / 100) % 6;
 	}
 	if (keystate[SDL_SCANCODE_SPACE] && player.onGround) {
 		player.vely = -15;
 		player.onGround = false;
 	}
 }
+
 // Создание функций для обновления состояния игрока
 void updatePlayer(Player& player, Platform& platform) {
 	// Гравитация
@@ -81,14 +111,23 @@ void updatePlayer(Player& player, Platform& platform) {
 }
 // рендер объектов
 void render(SDL_Renderer* renderer, Player& player, Platform& platform) {
-	SDL_SetRenderDrawColor(renderer, 155, 200, 235, 255);
+	//ochistka ecrana
+	SDL_SetRenderDrawColor(renderer, 155, 200, 235, 255); //цвет фона
 	SDL_RenderClear(renderer);
+
+	//platforma
 
 	SDL_SetRenderDrawColor(renderer, 0, 128, 0, 255);
 	SDL_RenderFillRect(renderer, &platform.rect);
 
-	SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-	SDL_RenderFillRect(renderer, &player.rect);
+	//player
+	int frameWigth = player.rect.w;
+	int frameHeight = player.rect.h;
+
+	SDL_Rect sourceRect = { player.frame * frameWigth, 0, frameWigth, frameHeight };
+	SDL_RenderCopyEx(renderer, player.texture, &sourceRect, &player.rect, 0, nullptr, player.direction == 1 ? SDL_FLIP_NONE : SDL_FLIP_HORIZONTAL);
+
+	//obnovlenie ecrana
 
 	SDL_RenderPresent(renderer);
 }
@@ -106,8 +145,10 @@ int main(int argc, char* argv[]) {
 	initSDL(&window, &renderer);
 
 	// Задаем начальные параметры игрока и платформы
-	Player player = { {100, 100, 50, 50}, 0, 0, false }; // Прямоугольник: {x, y, w, h}, скорость, на земле
-	Platform platform = { {0, 500, SCREEN_WIDTH, 50} };  // Платформа шириной во весь экран
+	Player player = { {100, 100, 52, 37}, 0, 0, false, nullptr, 0, 1}; // Прямоугольник: {x, y, w, h}, скорость, на земле
+	player.texture = loadTexture("\\assets\\adventurer-run3-sword-Sheet.png", renderer);
+
+	Platform platform = { {0, 500, SCREEN_WIDTH, 50}, nullptr };  // Платформа шириной во весь экран
 
 	bool quit = false;
 	SDL_Event e;
@@ -120,6 +161,8 @@ int main(int argc, char* argv[]) {
 		while (SDL_PollEvent(&e) != 0) {
 			if (e.type == SDL_QUIT) {
 				quit = true;
+				SDL_DestroyTexture(player.texture);
+				SDL_DestroyTexture(platform.texture);
 			}
 		}
 
