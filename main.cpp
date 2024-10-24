@@ -139,6 +139,7 @@ void closeSDL(SDL_Window* window, SDL_Renderer* renderer) {
 }
 
 int main(int argc, char* argv[]) {
+	setlocale(LC_ALL, "RUS");
 	SDL_Window* window = nullptr;
 	SDL_Renderer* renderer = nullptr;
 
